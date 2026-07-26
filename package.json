@@ -1,0 +1,21 @@
+{
+  "name": "xiaoyu-coach-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Xiaoyu Coach API service for WeChat mini program video analysis",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "worker": "node worker.js",
+    "test": "node --test",
+    "check": "node --check server.js",
+    "load-test": "node tools/load-test-analyses.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0",
+    "iconv-lite": "^0.6.3"
+  }
+}
