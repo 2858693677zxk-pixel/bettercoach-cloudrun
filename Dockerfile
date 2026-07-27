@@ -3,6 +3,7 @@ FROM ${NODE_IMAGE}
 
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ARG PIP_INDEX_URL=https://mirrors.ustc.edu.cn/pypi/simple
+ARG PIP_MEDIAPIPE_INDEX_URL=https://pypi.org/simple
 
 RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
@@ -21,11 +22,12 @@ RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debi
 RUN python3 -m venv /opt/xiaoyu-venv \
     && /opt/xiaoyu-venv/bin/pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" --upgrade pip \
     && /opt/xiaoyu-venv/bin/pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" \
-      "mediapipe==0.10.21" \
       "numpy<2" \
       "onnxruntime==1.23.2" \
       "opencv-python-headless>=4.10,<5" \
-      "rtmlib==0.0.15"
+      "rtmlib==0.0.15" \
+    && /opt/xiaoyu-venv/bin/pip install --no-cache-dir --index-url "${PIP_MEDIAPIPE_INDEX_URL}" \
+      "mediapipe==0.10.21"
 
 WORKDIR /app
 
