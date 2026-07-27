@@ -16,20 +16,63 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from enum import IntEnum
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 import cv2
-import mediapipe as mp
 import numpy as np
-from mediapipe.framework.formats import landmark_pb2
 
 from stability_profiles import stability_profile
 
 
-POSE = mp.solutions.pose
-DRAWING = mp.solutions.drawing_utils
-LANDMARK = POSE.PoseLandmark
+class PoseLandmark(IntEnum):
+    NOSE = 0
+    LEFT_EYE_INNER = 1
+    LEFT_EYE = 2
+    LEFT_EYE_OUTER = 3
+    RIGHT_EYE_INNER = 4
+    RIGHT_EYE = 5
+    RIGHT_EYE_OUTER = 6
+    LEFT_EAR = 7
+    RIGHT_EAR = 8
+    MOUTH_LEFT = 9
+    MOUTH_RIGHT = 10
+    LEFT_SHOULDER = 11
+    RIGHT_SHOULDER = 12
+    LEFT_ELBOW = 13
+    RIGHT_ELBOW = 14
+    LEFT_WRIST = 15
+    RIGHT_WRIST = 16
+    LEFT_PINKY = 17
+    RIGHT_PINKY = 18
+    LEFT_INDEX = 19
+    RIGHT_INDEX = 20
+    LEFT_THUMB = 21
+    RIGHT_THUMB = 22
+    LEFT_HIP = 23
+    RIGHT_HIP = 24
+    LEFT_KNEE = 25
+    RIGHT_KNEE = 26
+    LEFT_ANKLE = 27
+    RIGHT_ANKLE = 28
+    LEFT_HEEL = 29
+    RIGHT_HEEL = 30
+    LEFT_FOOT_INDEX = 31
+    RIGHT_FOOT_INDEX = 32
+
+
+LANDMARK = PoseLandmark
+POSE_CONNECTIONS = {
+    (0, 1), (1, 2), (2, 3), (3, 7),
+    (0, 4), (4, 5), (5, 6), (6, 8),
+    (9, 10), (11, 12),
+    (11, 13), (13, 15), (15, 17), (15, 19), (15, 21), (17, 19),
+    (12, 14), (14, 16), (16, 18), (16, 20), (16, 22), (18, 20),
+    (11, 23), (12, 24), (23, 24),
+    (23, 25), (25, 27), (27, 29), (29, 31), (27, 31),
+    (24, 26), (26, 28), (28, 30), (30, 32), (28, 32),
+}
 
 DEFAULT_POSE_BACKEND = "rtmlib"
 POSE_CONFIDENCE_FLOOR = 0.55
@@ -6278,17 +6321,6 @@ def score_result(issues: list[dict[str, Any]], confidence: float) -> tuple[int, 
     return score, "green"
 
 
-def normalized_landmark_list(landmarks: list[list[float]]) -> landmark_pb2.NormalizedLandmarkList:
-    landmark_list = landmark_pb2.NormalizedLandmarkList()
-    for x, y, z, visible in landmarks:
-        landmark = landmark_list.landmark.add()
-        landmark.x = float(x)
-        landmark.y = float(y)
-        landmark.z = float(z)
-        landmark.visibility = float(visible)
-    return landmark_list
-
-
 def draw_pose_landmarks(
     frame: np.ndarray,
     landmarks: list[list[float]],
@@ -6296,13 +6328,20 @@ def draw_pose_landmarks(
     landmark_color: tuple[int, int, int],
     connection_color: tuple[int, int, int],
 ) -> None:
-    DRAWING.draw_landmarks(
-        frame,
-        normalized_landmark_list(landmarks),
-        POSE.POSE_CONNECTIONS,
-        landmark_drawing_spec=DRAWING.DrawingSpec(color=landmark_color, thickness=2, circle_radius=2),
-        connection_drawing_spec=DRAWING.DrawingSpec(color=connection_color, thickness=2),
-    )
+    height, width = frame.shape[:2]
+    visible_points: dict[int, tuple[int, int]] = {}
+    for index, item in enumerate(landmarks):
+        if len(item) < 4 or float(item[3]) < 0.2:
+            continue
+        x = int(round(float(item[0]) * width))
+        y = int(round(float(item[1]) * height))
+        if 0 <= x < width and 0 <= y < height:
+            visible_points[index] = (x, y)
+    for start, end in POSE_CONNECTIONS:
+        if start in visible_points and end in visible_points:
+            cv2.line(frame, visible_points[start], visible_points[end], connection_color, 2, cv2.LINE_AA)
+    for position in visible_points.values():
+        cv2.circle(frame, position, 2, landmark_color, 2, cv2.LINE_AA)
 
 
 def even_dimension(value: int) -> int:
@@ -6979,6 +7018,13 @@ def extract_mediapipe_pose_frames(
     target_roi: list[float] | None = None,
 ) -> PoseBackendResult:
     del target_roi
+    try:
+        import mediapipe as mp  # type: ignore
+    except ImportError as error:
+        raise RuntimeError(
+            "MediaPipe backend is not installed in this RTMLib-only deployment"
+        ) from error
+    pose_api = mp.solutions.pose
     capture = cv2.VideoCapture(str(video_path))
     pose_frames: list[PoseFrame] = []
     segmentation_threshold = bounded_float_config("MEDIAPIPE_SEGMENTATION_LANDMARK_THRESHOLD", 0.35, 0.05, 0.95)
@@ -7017,7 +7063,7 @@ def extract_mediapipe_pose_frames(
         "yoloPersonSegmentationFilteredFrames": 0,
         "yoloPersonSegmentationExamples": [],
     }
-    with POSE.Pose(
+    with pose_api.Pose(
         static_image_mode=False,
         model_complexity=1,
         smooth_landmarks=True,
@@ -7555,6 +7601,7 @@ def estimate_pose_frames(
         "poseBackendFallback": None,
     }
     errors: list[str] = []
+    strict_backend = strict_backend or truthy_config(os.environ.get("POSE_BACKEND_STRICT"))
     backend_candidates = [requested] if strict_backend else pose_backend_order(requested)
     for backend in backend_candidates:
         extractor = available_extractors.get(backend)

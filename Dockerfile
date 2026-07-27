@@ -3,7 +3,6 @@ FROM ${NODE_IMAGE}
 
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ARG PIP_INDEX_URL=https://mirrors.ustc.edu.cn/pypi/simple
-ARG PIP_MEDIAPIPE_INDEX_URL=https://pypi.org/simple
 
 RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
@@ -25,9 +24,9 @@ RUN python3 -m venv /opt/xiaoyu-venv \
       "numpy<2" \
       "onnxruntime==1.23.2" \
       "opencv-python-headless>=4.10,<5" \
-      "rtmlib==0.0.15" \
-    && /opt/xiaoyu-venv/bin/pip install --no-cache-dir --index-url "${PIP_MEDIAPIPE_INDEX_URL}" \
-      "mediapipe==0.10.21"
+      "tqdm>=4.65,<5" \
+    && /opt/xiaoyu-venv/bin/pip install --no-cache-dir --no-deps --index-url "${PIP_INDEX_URL}" \
+      "rtmlib==0.0.15"
 
 WORKDIR /app
 
@@ -48,6 +47,7 @@ ENV HOST=0.0.0.0 \
     PORT=80 \
     ANALYZER_PYTHON=/opt/xiaoyu-venv/bin/python \
     POSE_BACKEND=rtmlib \
+    POSE_BACKEND_STRICT=true \
     POSE_ENGINE_COMPARE=false \
     POSE_RECHECK_LOW_CONFIDENCE=true \
     POSE_RECHECK_MAX_WINDOWS=8 \

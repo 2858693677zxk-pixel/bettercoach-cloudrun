@@ -3,6 +3,7 @@ set -eu
 
 export DATA_DIRECTORY="${DATA_DIRECTORY:-/data}"
 export POSE_BACKEND="rtmlib"
+export POSE_BACKEND_STRICT="true"
 export POSE_ENGINE_COMPARE="false"
 export RTMLIB_BACKEND="onnxruntime"
 export RTMLIB_DEVICE="cpu"
